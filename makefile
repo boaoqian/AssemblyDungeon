@@ -10,8 +10,8 @@ NASM_FLAGS = -f elf64
 LDFLAGS = -lSDL2 -lSDL2_image -lc -no-pie
 
 # 目标文件
-TARGET = sdl_square
-OBJS = helper.o main.o input.o vender.o player.o
+TARGET = Dungeon
+OBJS = helper.o main.o input.o vender.o player.o game.o
 
 # 默认目标
 all: $(TARGET)

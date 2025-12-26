@@ -17,8 +17,9 @@ posy dq 0
 state db 0
 anim_counter db 0
 timer db 0
+key_state dd 0
 player_texture dq 0
-move_speed db 0
+move_speed dq 0
 
 ;; text data
 img_path db "assets/player/walk.png", 0
@@ -61,7 +62,7 @@ init_player:
     mov byte [state], 2
     mov byte [anim_counter], 0
     mov byte [timer], 0
-    mov byte [move_speed], 5
+    mov qword [move_speed], 5
 
     add rsp, 8
     ret
@@ -81,7 +82,6 @@ show_player:
     imul rax, r10
     movzx r10, byte [anim_counter]
     add rax, r10
-    add rax, [anim_counter]         ; + anim_counter
     mov [rsp+0], rax                ; frame_index
     mov qword [rsp+8], sprite_columns  ; columns (64-bit!)
     call draw_sprite_anim
@@ -91,20 +91,20 @@ show_player:
 player_step:
     push rbp
     mov rbp, rsp
-    sub rsp, 24
+    sub rsp, 32
     mov al, [state]; old state
     mov [rsp+12], al
     lea rdi, event_buffer
-    lea rsi, [rsp] ;key bitmask
-    lea rdx, [rsp+4]; mouse_x
-    lea rcx, [rsp+8]; mouse_y
+    lea rsi, [key_state] ;key bitmask
+    lea rdx, [rsp+0]; mouse_x
+    lea rcx, [rsp+4]; mouse_y
     call input_poll
     test eax, eax
     jz .noesc
-    call stop_game
-    ret
+    jmp .exit
+
 .noesc:;;update pos
-    mov ecx, [rsp]          ; keys bitmask
+    mov ecx, [key_state]          ; keys bitmask
     ; W：向上
     test ecx, KEY_W
     jz .no_w
@@ -112,7 +112,7 @@ player_step:
     sub rax, [move_speed]
     cmp rax, pos_top
     jl .no_w
-    mov [posy] , eax
+    mov [posy] , rax
     mov byte [state], 0
 .no_w:
     ; S：向下
@@ -122,7 +122,7 @@ player_step:
     add rax, [move_speed]
     cmp rax, pos_bottom
     jg .no_s
-    mov [posy] , eax
+    mov [posy] , rax
     mov byte [state], 2
 .no_s:
     ; A：向左
@@ -132,7 +132,7 @@ player_step:
     sub rax, [move_speed]
     cmp rax, pos_left
     jl .no_a
-    mov [posx] , eax
+    mov [posx] , rax
     mov byte [state], 1
 .no_a:
     ; D：向右
@@ -142,7 +142,7 @@ player_step:
     add rax, [move_speed]
     cmp rax, pos_right
     jg .no_d
-    mov [posx] , eax
+    mov [posx] , rax
     mov byte [state], 3
 .no_d:
     mov al, [rsp+12]
@@ -150,6 +150,8 @@ player_step:
     je .no_change_state
     mov byte [anim_counter], 0
 .no_change_state:
+    or ecx, ecx
+    jz .idle_anim
     cmp byte [timer], anim_fps
     jl .no_update_anim
     mov byte [timer], 0
@@ -161,15 +163,26 @@ player_step:
     call show_player
     add byte [timer], 1
 
-    add rsp, 24
+    xor rax, rax
+    add rsp, 32
+    pop rbp
+    ret
+.idle_anim:
+    mov byte [anim_counter], 0
+    call show_player
+    mov byte [timer], 1
+    xor rax, rax
+    add rsp, 32
+    pop rbp
     ret
 
-
-stop_game:
-    call sdl_helper_quit
-    xor eax, eax
-    leave
+.exit:
+    ; ESC / Quit: 让 main 来退出
+    mov rax, 1
+    add rsp, 32
+    pop rbp
     ret
+
 
 
 
