@@ -14,15 +14,20 @@ anim_fps equ 60/10
 life db 0
 posx dq 0
 posy dq 0
+move_speed dq 0
 state db 0
-anim_counter db 0
-timer db 0
+weapon_cooldown db 0
+
 key_state dd 0
 player_texture dq 0
-move_speed dq 0
+anim_counter db 0
+timer db 0
+weapon_timer db 0
 
 ;; text data
 img_path db "assets/player/walk.png", 0
+debugmsg db "DEBUG: %d", 10, 0
+iimsg db "##########", 10, 0
 
 section .text
     global init_player
@@ -32,7 +37,11 @@ section .text
     extern load_texture
     extern draw_sprite_anim
     extern input_poll
-    extern sdl_helper_quit
+    extern gen_bullet
+    extern bullet_step 
+    extern show_bullet
+    extern set_bullet
+    extern printf
 
     extern event_buffer
     extern renptr
@@ -45,6 +54,7 @@ section .text
 %define KEY_S 2
 %define KEY_A 4
 %define KEY_D 8
+%define KEY_ENTER 16
 
 
 init_player:
@@ -103,7 +113,8 @@ player_step:
     jz .noesc
     jmp .exit
 
-.noesc:;;update pos
+.noesc:
+    ;update pos
     mov ecx, [key_state]          ; keys bitmask
     ; W：向上
     test ecx, KEY_W
@@ -162,15 +173,26 @@ player_step:
     .no_update_anim:
     call show_player
     add byte [timer], 1
+    jmp .done
 
-    xor rax, rax
-    add rsp, 32
-    pop rbp
-    ret
 .idle_anim:
     mov byte [anim_counter], 0
     call show_player
     mov byte [timer], 1
+
+.done:
+    mov ecx, [rsp]
+    cmp ecx, -1
+    je .no_mouse
+    mov rdi, 4
+    mov rsi, 10
+    call set_bullet
+    mov rdi, [posx]
+    mov rsi, [posy]
+    mov cl, [state]
+    call gen_bullet
+
+.no_mouse:
     xor rax, rax
     add rsp, 32
     pop rbp

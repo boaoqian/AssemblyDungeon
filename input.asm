@@ -7,6 +7,7 @@ extern SDL_PollEvent
 %define KEY_S 2
 %define KEY_A 4
 %define KEY_D 8
+%define KEY_ENTER 16
 
 %define SDL_QUIT            0x100
 %define SDL_KEYDOWN         0x300
@@ -19,6 +20,8 @@ extern SDL_PollEvent
 %define SC_S   22
 %define SC_A   4
 %define SC_D   7
+%define SC_ENTER 40
+
 
 %define EV_TYPE_OFF        0
 %define EV_SCANCODE_OFF    16
@@ -131,6 +134,12 @@ input_poll:
     and r8d, ~KEY_D
     mov dword [r13], r8d
     jmp .poll
+; .ku_enter:
+;     cmp eax, SC_ENTER
+;     jne .poll
+;     and r8d, ~KEY_D
+;     mov dword [r13], r8d
+;     jmp .poll
 
 .on_mouse:
     xor eax, eax
