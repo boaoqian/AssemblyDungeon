@@ -1,16 +1,12 @@
 section .data
     bktexture dq 0
     frame_start dd 0
-    have_bullet db 0
-    have_mob db 0
 
     bk_path db "assets/bk.png", 0
 
 
 section .text
     global run_game
-    global have_bullet
-    global have_mob
 
     extern load_texture
     extern renptr
@@ -19,7 +15,8 @@ section .text
     extern draw_sprite_anim
     extern init_player
     extern player_step
-    extern bullet_step
+    extern bullets_step_all
+    extern get_active_bullets_num
 
     extern SDL_Delay
     extern SDL_GetTicks
@@ -38,8 +35,6 @@ run_game:
     mov rsi, bk_path
     call load_texture
     mov [bktexture], rax
-    mov byte [have_bullet], 0
-    mov byte [have_mob], 0
 
 .loop:
     call SDL_GetTicks
@@ -63,10 +58,10 @@ run_game:
     call player_step
     cmp rax, 0
     jnz .exit
-    mov cl, [have_bullet]
-    cmp cl, 0
-    je .present
-    call bullet_step
+    call get_active_bullets_num
+    cmp rax, 0
+    jz .present
+    call bullets_step_all
 
 .present:
     mov rdi, [renptr]

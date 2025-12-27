@@ -34,6 +34,11 @@ section .text
     global player_step 
     global show_player
 
+    global get_player_pos
+    global set_player_pos
+    global get_player_life
+    global set_player_life
+
     extern load_texture
     extern draw_sprite_anim
     extern input_poll
@@ -68,7 +73,7 @@ init_player:
     ;;init value
     mov qword [posx], 500
     mov qword [posy], 350
-    mov byte [life], 0
+    mov byte [life], 100
     mov byte [state], 2
     mov byte [anim_counter], 0
     mov byte [timer], 0
@@ -204,6 +209,35 @@ player_step:
     add rsp, 32
     pop rbp
     ret
+
+;rdi -> [2dqword]
+get_player_pos:
+    mov rax, [posx]
+    mov [rdi], rax
+    mov rax, [posy]
+    mov [rdi+8], rax
+    xor rax, rax
+    ret
+
+; rdi = x, rsi = y
+; void set_player_pos(int64 x, int64 y)
+set_player_pos:
+    mov [posx], rdi
+    mov [posy], rsi
+    ret
+
+; uint8 get_player_life()
+; return: al/rax = life (zero-extended)
+get_player_life:
+    movzx eax, byte [life]
+    ret
+
+; rdi = new life (只取低 8 位)
+; void set_player_life(uint8 life)
+set_player_life:
+    mov byte [life], dil
+    ret
+
 
 
 
