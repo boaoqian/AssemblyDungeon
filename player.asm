@@ -1,13 +1,13 @@
 section .data
 align 16
 ;;constants
-sprite_size equ 128
-half_sprite_size equ sprite_size/2
+player_sprite_size equ 128
+half_player_sprite_size equ player_sprite_size/2
 sprite_columns equ 9
-pos_top equ half_sprite_size+10
-pos_bottom equ win_h-half_sprite_size-10
-pos_left equ half_sprite_size+10
-pos_right equ win_w-half_sprite_size-10
+pos_top equ half_player_sprite_size+10
+pos_bottom equ win_h-half_player_sprite_size-10
+pos_left equ half_player_sprite_size+10
+pos_right equ win_w-half_player_sprite_size-10
 anim_fps equ 60/10
 
 ;; global variables
@@ -17,6 +17,8 @@ posy dq 0
 move_speed dq 0
 state db 0
 weapon_cooldown db 0
+hurt_cooldown db 5
+hurt_timer db 0
 
 key_state dd 0
 player_texture dq 0
@@ -38,6 +40,7 @@ section .text
     global set_player_pos
     global get_player_life
     global set_player_life
+    global hurt_player
 
     extern load_texture
     extern draw_sprite_anim
@@ -87,11 +90,11 @@ show_player:
     mov rdi, [renptr]
     mov rsi, [player_texture]
     mov rdx, [posx]
-    sub rdx, half_sprite_size       
+    sub rdx, half_player_sprite_size       
     mov rcx, [posy]
-    sub rcx, half_sprite_size
-    mov r8d, sprite_size
-    mov r9d, sprite_size
+    sub rcx, half_player_sprite_size
+    mov r8d, player_sprite_size
+    mov r9d, player_sprite_size
     movzx rax, byte [state]         ; 零扩展字节到 64 位
     mov r10, sprite_columns
     imul rax, r10
@@ -178,26 +181,35 @@ player_step:
     .no_update_anim:
     call show_player
     add byte [timer], 1
-    jmp .done
+    jmp .check_mouse
 
 .idle_anim:
     mov byte [anim_counter], 0
-    call show_player
     mov byte [timer], 1
 
-.done:
+.check_mouse:
     mov ecx, [rsp]
     cmp ecx, -1
-    je .no_mouse
+    je .draw_player
     mov rdi, 4
     mov rsi, 10
     call set_bullet
     mov rdi, [posx]
     mov rsi, [posy]
-    mov cl, [state]
+    movzx cx, byte [state]
     call gen_bullet
 
-.no_mouse:
+.check_hurt:
+    movzx eax, byte [hurt_timer]
+    cmp eax, 0
+    je .draw_player
+    dec byte [hurt_timer]
+    test eax, 1
+    jz .done ;闪烁
+
+.draw_player:
+    call show_player
+.done:
     xor rax, rax
     add rsp, 32
     pop rbp
@@ -210,12 +222,12 @@ player_step:
     pop rbp
     ret
 
-;rdi -> [2dqword]
+;rdi rsi 
 get_player_pos:
     mov rax, [posx]
     mov [rdi], rax
     mov rax, [posy]
-    mov [rdi+8], rax
+    mov [rsi], rax
     xor rax, rax
     ret
 
@@ -236,6 +248,22 @@ get_player_life:
 ; void set_player_life(uint8 life)
 set_player_life:
     mov byte [life], dil
+    ret
+
+; void hurt(rdi = damage)
+hurt_player:
+    movzx eax, byte [hurt_timer]
+    cmp eax, 0
+    je .hurt
+    jmp .done
+.hurt:
+    movzx eax, byte [life]
+    sub al, dil
+    mov byte [life], al
+    mov al, [hurt_cooldown]
+    mov byte [hurt_timer], al
+.done:
+    xor rax, rax
     ret
 
 

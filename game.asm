@@ -18,12 +18,18 @@ section .text
     extern bullets_step_all
     extern get_active_bullets_num
 
+    extern set_mob
+    extern gen_mob
+    extern mobs_step_all
+    extern get_active_mobs_num
+
     extern SDL_Delay
     extern SDL_GetTicks
     extern SDL_SetRenderDrawColor
     extern SDL_RenderClear
     extern SDL_RenderFillRect
     extern SDL_RenderPresent
+    extern printf
 
 run_game:
     push rbp
@@ -35,6 +41,15 @@ run_game:
     mov rsi, bk_path
     call load_texture
     mov [bktexture], rax
+
+.init_mob:
+    mov rdi, 10
+    mov rsi, 10
+    call set_mob
+    mov rdi, 300
+    mov rsi, 300
+    mov cl, 0
+    call gen_mob
 
 .loop:
     call SDL_GetTicks
@@ -60,8 +75,13 @@ run_game:
     jnz .exit
     call get_active_bullets_num
     cmp rax, 0
-    jz .present
+    jz .no_bullet
     call bullets_step_all
+    .no_bullet:
+    ; call get_active_mobs_num
+    ; cmp rax, 0
+    ; jz .present
+    call mobs_step_all
 
 .present:
     mov rdi, [renptr]
