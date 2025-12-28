@@ -1,7 +1,8 @@
-# 地牢冒险（Dungeon Adventure）- NASM x64 + SDL2
+# 地牢冒险（Dungeon）- NASM x64 + SDL2
 
 一个使用 **NASM（x86_64 汇编）** 编写的地牢冒险小游戏，基于 **SDL2** 与 **SDL2_image** 进行窗口、渲染与资源加载。
 
+![截图](assets/readme/main.png)
 ---
 
 ## 运行环境
@@ -30,7 +31,7 @@
 
   
   
-![截图](./assets/readme.png)
+![截图](assets/readme/readme.png)
 
 
 ---
