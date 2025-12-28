@@ -10,6 +10,7 @@ section .data
     mouse_x dd 0
     mouse_y dd 0
     is_esc db 0
+    max_mobs dq 5
 
 
 section .text
@@ -41,12 +42,16 @@ section .text
     extern get_active_mobs_num
     extern check_player_mob_collisions
     extern check_mob_bullet_collisions
+    extern check_player_drop_collisions
     extern ui_init
     extern ui_handle_mouse
     extern map_init
     extern map_step
     extern map_get_bktexture
     extern map_get_clear_flag
+
+    extern gen_drop
+    extern drops_step_all
 
 
     extern SDL_Delay
@@ -61,10 +66,16 @@ run_game:
     push rbp
     mov rbp, rsp
 .init_game:
+    mov [max_mobs], 5
     call init_player
     call ui_init
-    mov rdi, 20          ; 例：本关总共最多生成60只怪（你想要多少改这里）
+    mov rdi, [max_mobs]          ; 例：本关总共最多生成60只怪（你想要多少改这里）
     call map_init
+
+    ;test
+    ; mov rdi, 200
+    ; mov rsi, 200
+    ; call gen_drop
     
 .loop:
     call SDL_GetTicks
@@ -103,6 +114,7 @@ run_game:
     cmp eax, 1
     je .next_level
 
+    call drops_step_all
     call map_step
     call player_step
     cmp rax, 0
@@ -129,6 +141,7 @@ run_game:
     ;检查玩家和怪物的碰撞
     call check_player_mob_collisions
     call check_mob_bullet_collisions
+    call check_player_drop_collisions
     ;更新画面
     mov rdi, [renptr]
     call SDL_RenderPresent
@@ -161,15 +174,17 @@ run_game:
     .sp:
     cmp eax, 2
     je .init_new_level
+    mov [max_mobs], 5
     call init_player
     call ui_init
-    mov rdi, 20          ; 例：本关总共最多生成60只怪（你想要多少改这里）
+    mov rdi, [max_mobs]        ; 例：本关总共最多生成60只怪（你想要多少改这里）
     call map_init
     jmp .nosleep
     
     .init_new_level:
+    add qword [max_mobs], 5
     call ui_init
-    mov rdi, 20          ; 例：本关总共最多生成60只怪（你想要多少改这里）
+    mov rdi, [max_mobs]          ; 例：本关总共最多生成60只怪（你想要多少改这里）
     call map_init
     jmp .nosleep
 

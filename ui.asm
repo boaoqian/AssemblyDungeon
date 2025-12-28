@@ -15,6 +15,9 @@ section .data
     resume_btn_path    db "assets/ui/btn_resume.png", 0      ; 暂停界面“继续”
     quit_btn_path      db "assets/ui/btn_quit.png", 0        ; （可选）退出
     pause_panel_path   db "assets/ui/pause_panel.png", 0     ; 暂停面板背景（可选）
+    dead_panel_path db "assets/ui/dead_panel.png", 0
+    next_level_panel_path db "assets/ui/next_panel.png", 0
+
     debugmsg db "debug: %d", 10, 0
 
     ; ===== 贴图句柄 =====
@@ -22,6 +25,8 @@ section .data
     tex_resume_btn   dq 0
     tex_quit_btn     dq 0
     tex_pause_panel  dq 0
+    tex_dead_panel   dq 0
+    tex_next_level_panel dq 0
 
     ; ===== UI矩形（用“图片真实宽高”更好，但你当前 draw_texture 会自动查询尺寸:contentReference[oaicite:4]{index=4}）
     ; 这里我们只需要：按钮摆放位置 + 你按钮图片的宽高（用于点击检测）
@@ -378,6 +383,17 @@ ui_init_overlay:
     call load_texture
     mov [tex_pause_panel], rax
 
+    mov rdi, [renptr]
+    mov rsi, dead_panel_path
+    call load_texture
+    mov [tex_dead_panel], rax
+
+    mov rdi, [renptr]
+    mov rsi, next_level_panel_path
+    call load_texture
+    mov [tex_next_level_panel], rax
+
+
     mov dword [ui_state], 0
 
     add rsp, 8
@@ -463,7 +479,7 @@ ui_draw_overlay:
 .draw_gameover:
     ; 面板（可选）
     mov rdi, [renptr]
-    mov rsi, [tex_pause_panel]
+    mov rsi, [tex_next_level_panel]
     mov edx, PANEL_X
     mov ecx, PANEL_Y
     call draw_texture
@@ -486,7 +502,7 @@ ui_draw_overlay:
 .draw_next:
         ; 面板（可选）
     mov rdi, [renptr]
-    mov rsi, [tex_pause_panel]
+    mov rsi, [tex_dead_panel]
     mov edx, PANEL_X
     mov ecx, PANEL_Y
     call draw_texture

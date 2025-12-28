@@ -101,6 +101,8 @@ main:
     call draw_bkg
     mov rdi, [renptr]
     call SDL_RenderPresent    
+    mov rdi, 10
+    call SDL_Delay
     jmp .loop
 
 ._game:

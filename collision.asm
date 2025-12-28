@@ -15,6 +15,29 @@ half_mob          equ mob_size/2
 radius_sum        equ (half_player + half_mob)
 radius_sum_sq     equ (radius_sum * radius_sum)
 
+; ===== drops =====
+MAX_DROPS equ 64
+
+; drop 图块 48x48（和 drop.asm 默认一致）
+drop_size      equ 48
+half_drop      equ drop_size/2
+
+; player_size 在你 collision.asm 里已经有 player_sprite_size equ 128
+; 半径和：玩家半径 + 掉落物半径
+radius_sum_drop    equ (half_player + half_drop)
+radius_sum_drop_sq equ (radius_sum_drop * radius_sum_drop)
+
+; Drop struct layout（要和 drop.asm 一致）
+D_ACTIVE equ 0
+D_TYPE   equ 1
+D_ANIM   equ 2
+D_TIMER  equ 3
+D_X      equ 8
+D_Y      equ 16
+D_SIZE   equ 24
+
+heal_per_pick db 10   ; 捡到一次加多少血（你想改就改）
+
 ;; Mob struct layout (offsets)
 M_ACTIVE  equ 0      ; db  0/1
 M_STATE   equ 1      ; db
@@ -28,7 +51,6 @@ M_SKILL_CD_TIMER equ 32
 M_ATK_VX   equ 40     ; dq (double) 方向x（单位向量）
 M_ATK_VY   equ 48     ; dq (double) 方向y
 M_SIZE     equ 56     ;
-
 
 ; --- bullet struct layout (from bullet.asm) ---
 B_ACTIVE  equ 0
@@ -48,7 +70,11 @@ damage_per_hit db 10               ; 每次碰撞扣多少血（你可改）
 section .text
 global check_player_mob_collisions
 global check_mob_bullet_collisions
+global check_player_drop_collisions
 
+extern get_all_drops_data
+extern get_player_max_mana
+extern set_player_max_mana
 extern get_player_pos
 extern hurt_player
 extern get_all_mobs_data
@@ -225,4 +251,66 @@ check_mob_bullet_collisions:
     pop  r14
     pop  r13
     pop  r12
+    ret
+
+;---------------------------------------------------------
+; void check_player_drop_collisions()
+;  - 遍历 drops，若碰撞则：
+;      1) heal_player(heal_per_pick)
+;      2) drop 失活（消失）
+;---------------------------------------------------------
+check_player_drop_collisions:
+    push rbp
+    mov rbp, rsp
+    sub rsp, 32                    ; [0]=px [8]=py [16]=dx [24]=dy
+
+    ; 取玩家坐标到 [rsp+0]=x, [rsp+8]=y
+    lea rdi, [rsp+0]
+    lea rsi, [rsp+8]
+    call get_player_pos
+
+    ; rbx = drops base
+    call get_all_drops_data
+    mov rbx, rax
+
+    mov ecx, MAX_DROPS
+
+.loop:
+    cmp byte [rbx + D_ACTIVE], 0
+    je .next
+
+    ; dx = drop_x - player_x
+    mov rax, [rbx + D_X]
+    sub rax, [rsp+0]
+    mov [rsp+16], rax
+
+    ; dy = drop_y - player_y
+    mov rdx, [rbx + D_Y]
+    sub rdx, [rsp+8]
+    mov [rsp+24], rdx
+
+    ; dist2 = dx*dx + dy*dy
+    imul rax, rax
+    imul rdx, rdx
+    add rax, rdx
+
+    ; hit ?
+    cmp rax, radius_sum_drop_sq
+    ja .next
+
+    ; 1) drop 消失
+    mov byte [rbx + D_ACTIVE], 0
+
+    call get_player_max_mana
+    add rax, 100
+    mov rdi, rax
+    call set_player_max_mana
+
+.next:
+    add rbx, D_SIZE
+    dec ecx
+    jnz .loop
+
+    add rsp, 32
+    pop rbp
     ret

@@ -4,7 +4,6 @@
 ;  - 掉落物品不移动：只更新动画（可关）并绘制
 ;
 ; 导出：
-;   set_drop(rdi=size, rsi=columns)          ; 配置尺寸/列数(动画帧列)
 ;   gen_drop(rdi=x, rsi=y, rdx=type)         ; 生成一个掉落物（type可用于挑不同图行/不同图）
 ;   drops_step_all()
 ;   get_all_drops_data() -> rax = &drops
@@ -27,8 +26,8 @@ MAX_DROPS        equ 64
 ; ===== 可配置参数（set_drop 写入）=====
 drop_size        dq 48             ; 默认 48x48
 drop_half        dq 24
-drop_columns     dq 4              ; 一行多少帧（动画列数）
-anim_fps         equ 60/8          ; 每 (60/8)=7 帧切一次动画（你也可改）
+drop_columns     dq 2              ; 一行多少帧（动画列数）
+anim_fps         equ 60/4          ; 每 (60/8)=7 帧切一次动画（你也可改）
 
 ; ===== Drop struct layout (offsets) =====
 D_ACTIVE  equ 0     ; db 0/1
@@ -52,11 +51,10 @@ drops: times MAX_DROPS*D_SIZE db 0
 
 ; ===== texture =====
 drop_texture dq 0
-img_path db "assets/mod/drop.png", 0  ; 你换成自己的掉落物贴图
-                                      ; 建议贴图排布：按行是 type，按列是 anim
+img_path db "assets/dorp.png", 0  ; 你换成自己的掉落物贴图
+err_msg db "drop_err", 10, 0
 
 section .text
-global set_drop
 global gen_drop
 global drops_step_all
 global get_all_drops_data
@@ -66,19 +64,8 @@ global clear_drops
 extern load_texture
 extern draw_sprite_anim
 extern renptr
+extern printf
 
-;-----------------------------------------
-; set_drop(rdi=size, rsi=columns)
-;  - size: 物品绘制尺寸（正方形）
-;  - columns: 每行动画帧数量
-;-----------------------------------------
-set_drop:
-    mov [drop_size], rdi
-    mov rax, rdi
-    shr rax, 1
-    mov [drop_half], rax
-    mov [drop_columns], rsi
-    ret
 
 ;-----------------------------------------
 ; internal: ensure texture loaded once
@@ -97,7 +84,7 @@ ensure_drop_texture:
     ret
 
 ;-----------------------------------------
-; gen_drop(rdi=x, rsi=y, rdx=type)
+; gen_drop(rdi=x, rsi=y)
 ;  - 找空位并初始化
 ;-----------------------------------------
 gen_drop:
@@ -127,7 +114,7 @@ gen_drop:
 
 .init:
     mov byte [r9 + D_ACTIVE], 1
-    mov byte [r9 + D_TYPE], dl
+    mov byte [r9 + D_TYPE], 0
     mov byte [r9 + D_ANIM], 0
     mov byte [r9 + D_TIMER], 0
     mov [r9 + D_X], rdi
@@ -179,6 +166,7 @@ show_drop:
 ;  - 更新动画（如果你想静止不闪，注释掉 anim 部分即可）
 ;-----------------------------------------
 drop_step:
+    sub rsp, 8
     ; --- 动画更新 ---
     cmp byte [timer], anim_fps
     jl .no_update_anim
@@ -194,6 +182,7 @@ drop_step:
     ; --- 绘制 ---
     call show_drop
     xor eax, eax
+    add rsp, 8
     ret
 
 ;-----------------------------------------
@@ -227,6 +216,9 @@ drops_step_all:
     mov r12, r9
     call drop_step
     mov r9, r12
+
+    mov rdi, err_msg
+    call printf
 
     ; temp -> pool
     mov al, [anim_counter]

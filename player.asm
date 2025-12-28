@@ -15,7 +15,7 @@ dead_anim_fps equ 60/5
 ;; global variables
 is_dead db 0
 life dq 100
-max_life dq 50
+max_life dq 100
 mana        dq 100        ; 当前法力
 max_mana    dq 100        ; 最大法力
 mana_timer  db 0          ; 用于每秒恢复
@@ -335,6 +335,7 @@ get_player_pos:
 
 global get_player_mana
 global get_player_max_mana
+global set_player_max_mana
 
 get_player_mana:
     mov rax, [mana]
@@ -342,6 +343,10 @@ get_player_mana:
 
 get_player_max_mana:
     mov rax, [max_mana]
+    ret
+
+set_player_max_mana:
+    mov [max_mana], rdi
     ret
 
 ; rdi = x, rsi = y
