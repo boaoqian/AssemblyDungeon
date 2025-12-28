@@ -42,7 +42,7 @@
 ```bash
 sudo apt update
 sudo apt install -y build-essential nasm pkg-config
-~~~
+```
 
 ### 2) 安装 SDL2 与 SDL2_image 开发库
 
