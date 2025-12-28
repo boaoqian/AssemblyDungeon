@@ -28,10 +28,12 @@ mob_columns       equ 8                 ; 每行 4 帧动画
 anim_fps          equ 60//8             ; 每 6 帧切一次动画
 
 ;; 屏幕边界（留一点边距，可自行调整）
-pos_top           equ half_mob_size+10
-pos_bottom        equ win_h-half_mob_size-10
-pos_left          equ half_mob_size+10
-pos_right         equ win_w-half_mob_size-10
+pos_top           equ half_mob_size+50
+pos_bottom        equ win_h-half_mob_size-100
+pos_left          equ half_mob_size+50
+pos_right         equ win_w-half_mob_size-50
+
+
 
 MAX_MOBS          equ 32
 
@@ -44,7 +46,10 @@ M_PAD     equ 4      ; padding -> align to 8
 M_X       equ 8      ; dq
 M_Y       equ 16     ; dq
 M_HP      equ 24     ; dq
-M_SIZE    equ 32     ; total bytes per mob (aligned to 8)
+M_SKILL_CD_TIMER equ 32
+M_ATK_VX   equ 40     ; dq (double) 方向x（单位向量）
+M_ATK_VY   equ 48     ; dq (double) 方向y
+M_SIZE     equ 56     ;
 
 ;; 用于复用旧式 step 的临时变量（和你 bullet.asm 类似）
 posx         dq 0
@@ -55,6 +60,16 @@ hp_tmp       dq 0
 state        db 0
 anim_counter db 0
 timer        db 0
+skill_cd     dq 60
+skill_cd_timer  dq 0
+atk_vx dq 0
+atk_vy dq 0
+
+;; 攻击向量
+inv_65535 dq 1.52590218966964e-5   ; 1.0/65535.0
+one       dq 1.0
+atk_jitter dq 0.5
+
 
 ;; pool
 mobs: times MAX_MOBS*M_SIZE db 0
@@ -63,11 +78,13 @@ mobs: times MAX_MOBS*M_SIZE db 0
 default_hp    dq 0
 default_speed dq 0
 atteck_speed  dq 0
+now_speed     dq 0
 
 mob_texture dq 0
 
 ;; texture path
 img_path db "assets/mod/slimer.png", 0
+debugmsg db "debug: %d",10, 0
 
 section .text
 global set_mob
@@ -75,6 +92,8 @@ global gen_mob
 global mobs_step_all
 global get_all_mobs_data
 global get_active_mobs_num
+global clear_mobs
+
 
 extern load_texture
 extern draw_sprite_anim
@@ -82,7 +101,8 @@ extern get_player_pos
 extern renptr
 extern win_h     ; value
 extern win_w     ; value
-
+extern printf
+extern rand_u32
 
 ;-----------------------------------------
 ; set_mob(rdi=hp, rsi=speed)
@@ -199,8 +219,45 @@ mob_step:
     push rbp
     mov rbp, rsp
     sub rsp, 32
-    
+
     call face_to_player
+    mov rax, [default_speed]
+    mov [now_speed], rax
+    ;;skill
+    mov rax, [skill_cd_timer]
+    cmp rax, [skill_cd]
+    jl .wait_cd
+    mov al, [state] ;map
+    cmp al, 0
+    je .to_left
+    mov byte [state], 2
+    jmp .ff
+    .to_left:
+    mov byte [state], 1
+    .ff:
+    cmp byte [anim_counter], 3
+    jge .atteck
+    call lock_attack_dir
+    jmp .after_move
+    .atteck
+    mov rax, [atteck_speed]
+    mov [now_speed], rax
+    call move_by_locked_dir
+    cmp byte [anim_counter], mob_columns-1
+    jne .after_move
+    mov byte [anim_counter], 0
+    mov qword [skill_cd_timer], 0
+    jmp .after_move
+
+    .wait_cd:
+    inc qword [skill_cd_timer]
+    mov rax, [skill_cd_timer]
+    cmp rax, skill_cd
+    jl .update_pos
+    ;;init skill
+    mov byte [anim_counter], 0
+
+.update_pos:
     call close_to_player
 
 .after_move:
@@ -243,6 +300,7 @@ mob_step:
 
     ; --- 绘制 ---
     call show_mob
+
     xor eax, eax          ; alive
 
     add rsp, 32
@@ -284,7 +342,7 @@ close_to_player:
     jbe .after_move                 ; len <= 0
 
     ; speed_d = (double)atteck_speed
-    mov rax, [default_speed]
+    mov rax, [now_speed]
     cvtsi2sd xmm4, rax              ; xmm4 = speed
 
     ; vx = dx / len * speed
@@ -305,6 +363,103 @@ close_to_player:
     cvttsd2si rax, xmm6
     add [posy], rax
 .after_move:
+    ret
+
+lock_attack_dir:
+    ; dx = player_x - posx
+    mov rax, [player_x]
+    sub rax, [posx]
+    cvtsi2sd xmm0, rax        ; xmm0 = dx
+
+    ; dy = player_y - posy
+    mov rdx, [player_y]
+    sub rdx, [posy]
+    cvtsi2sd xmm1, rdx        ; xmm1 = dy
+
+    ; len = sqrt(dx*dx + dy*dy)
+    movapd xmm2, xmm0
+    mulsd  xmm2, xmm2
+    movapd xmm3, xmm1
+    mulsd  xmm3, xmm3
+    addsd  xmm2, xmm3
+    sqrtsd xmm2, xmm2
+
+    xorpd  xmm7, xmm7
+    comisd xmm2, xmm7
+    jbe .zero
+
+    ; ---------- 归一化 ----------
+    divsd xmm0, xmm2          ; dx /= len
+    divsd xmm1, xmm2          ; dy /= len
+
+; ---------- 随机扰动 ----------
+; jitter = ((rand&0xFFFF)/65535.0 * 2.0 - 1.0) * atk_jitter
+
+    ; ---- jitter_x ----
+    call rand_u32
+    and eax, 0FFFFh
+    cvtsi2sd xmm4, eax
+    mulsd xmm4, [inv_65535]     ; [0,1]
+    addsd xmm4, xmm4            ; [0,2]
+    subsd xmm4, [one]           ; [-1,1]
+    mulsd xmm4, [atk_jitter]    ; [-j,+j]
+
+    ; ---- jitter_y ----
+    call rand_u32
+    and eax, 0FFFFh
+    cvtsi2sd xmm5, eax
+    mulsd xmm5, [inv_65535]     ; [0,1]
+    addsd xmm5, xmm5            ; [0,2]
+    subsd xmm5, [one]           ; [-1,1]
+    mulsd xmm5, [atk_jitter]    ; [-j,+j]
+
+    addsd xmm0, xmm4            ; dx += jitter_x
+    addsd xmm1, xmm5            ; dy += jitter_y
+
+
+    ; ---------- 再归一化 ----------
+    movapd xmm2, xmm0
+    mulsd  xmm2, xmm2
+    movapd xmm3, xmm1
+    mulsd  xmm3, xmm3
+    addsd  xmm2, xmm3
+    sqrtsd xmm2, xmm2
+
+    xorpd xmm7, xmm7
+    comisd xmm2, xmm7
+    jbe .zero
+
+    divsd xmm0, xmm2
+    divsd xmm1, xmm2
+
+    movsd [atk_vx], xmm0
+    movsd [atk_vy], xmm1
+    ret
+
+.zero:
+    xorpd xmm0, xmm0
+    xorpd xmm1, xmm1
+    movsd [atk_vx], xmm0
+    movsd [atk_vy], xmm1
+    ret
+
+
+move_by_locked_dir:
+    ; speed -> xmm4
+    mov rax, [now_speed]
+    cvtsi2sd xmm4, rax
+
+    ; vx = atk_vx * speed
+    movsd xmm5, [atk_vx]
+    mulsd xmm5, xmm4
+    cvttsd2si rax, xmm5
+    add [posx], rax
+
+    ; vy = atk_vy * speed
+    movsd xmm6, [atk_vy]
+    mulsd xmm6, xmm4
+    cvttsd2si rax, xmm6
+    add [posy], rax
     ret
 
 
@@ -352,16 +507,16 @@ mobs_step_all:
     mov [anim_counter], al
     mov al, [r9 + M_TIMER]
     mov [timer], al
+    mov rax, [r9 + M_SKILL_CD_TIMER]
+    mov [skill_cd_timer], rax
+    mov rax, [r9 + M_ATK_VX]
+    mov [atk_vx], rax
+    mov rax, [r9 + M_ATK_VY]
+    mov [atk_vy], rax
 
     mov r12, r9
     call mob_step
     mov r9, r12
-
-    ;temp->pool
-    mov rax, [posx]
-    mov [r9 + M_X], rax
-    mov rax, [posy]
-    mov [r9 + M_Y], rax
 
     cmp eax, 1
     je .kill
@@ -377,6 +532,12 @@ mobs_step_all:
     mov [r9 + M_ANIM], al
     mov al, [timer]
     mov [r9 + M_TIMER], al
+    mov rax, [skill_cd_timer]
+    mov [r9 + M_SKILL_CD_TIMER], rax
+    mov rax, [atk_vx]
+    mov [r9 + M_ATK_VX], rax
+    mov rax, [atk_vy]
+    mov [r9 + M_ATK_VY], rax
 
     jmp .next
 
@@ -417,4 +578,17 @@ get_active_mobs_num:
     add r8, M_SIZE
     dec ecx
     jnz .loop2
+    ret
+
+;-----------------------------------------
+; clear_mobs():
+;  - 将 mobs pool 整块清零
+;-----------------------------------------
+clear_mobs:
+    lea rdi, [mobs]                          ; 目标地址
+    xor eax, eax                             ; rax=0 (要写入的值)
+    mov ecx, (MAX_MOBS*M_SIZE)/8             ; 以 qword 为单位清
+    rep stosq
+
+    ; 如果 MAX_MOBS*M_SIZE 不是 8 的倍数，这里再补清剩余字节（你现在是 32*56=1792，刚好整除8，可省略）
     ret

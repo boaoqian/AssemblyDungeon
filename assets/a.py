@@ -14,8 +14,11 @@ def resize_and_center_crop(input_path, output_path, scale=4):
     """
     with Image.open(input_path) as img:
         original_width, original_height = img.size
-        # new_resized = img.resize((int(original_width * scale), int(original_height * scale)), Image.Resampling.NEAREST)
-        new_resized = img.resize((original_width, 82), Image.Resampling.NEAREST)
+        # corp = img.crop((0,0,64*6,original_height))
+        # new_resized = img.resize((int(64*6 * scale), int(original_height * scale)), Image.Resampling.NEAREST)
+        # new_resized = img.resize((original_width, 82), Image.Resampling.NEAREST)
+        new_resized = img.resize((int(original_width * scale), int(original_height * scale)), Image.Resampling.NEAREST)
+
 
 
 
@@ -34,4 +37,4 @@ if __name__ == "__main__":
         print(f"错误：输入文件 {input_file} 不存在。")
         sys.exit(1)
 
-    resize_and_center_crop(input_file, input_file, scale=2)
+    resize_and_center_crop(input_file, input_file+"2x.png", scale=2)

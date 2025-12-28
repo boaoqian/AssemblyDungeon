@@ -11,7 +11,7 @@ LDFLAGS = -lSDL2 -lSDL2_image -lc -no-pie
 
 # 目标文件
 TARGET = Dungeon
-OBJS = helper.o main.o input.o vender.o player.o game.o bullet.o mob.o
+OBJS = helper.o main.o input.o vender.o player.o game.o bullet.o mob.o collision.o ui.o map.o
 
 # 默认目标
 all: $(TARGET)

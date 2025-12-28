@@ -4,10 +4,10 @@ align 16
 bullet_sprite_size equ 64
 half_bullet_sprite_size equ bullet_sprite_size/2
 sprite_columns equ 4
-pos_top equ half_bullet_sprite_size+10
-pos_bottom equ win_h-half_bullet_sprite_size-10
-pos_left equ half_bullet_sprite_size+10
-pos_right equ win_w-half_bullet_sprite_size-10
+pos_top equ half_bullet_sprite_size+20
+pos_bottom equ win_h-half_bullet_sprite_size-100
+pos_left equ half_bullet_sprite_size+20
+pos_right equ win_w-half_bullet_sprite_size-50
 anim_fps equ 60/10
 
 
@@ -350,4 +350,9 @@ get_active_bullets_num:
     add r8, B_SIZE
     dec ecx
     jnz .loop
+    ret
+
+global get_bullet_hurt
+get_bullet_hurt:
+    mov rax, [default_hurt]
     ret

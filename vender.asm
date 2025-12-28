@@ -4,6 +4,7 @@ global load_texture
 global draw_texture
 global draw_bkg
 global draw_sprite_anim
+global draw_life_bar
 
 extern SDL_QueryTexture
 extern SDL_RenderCopy
@@ -82,6 +83,7 @@ draw_texture:
 
     add rsp, 8
     ret
+
 
 ; 绘制背景
 ;renderer=rdi, texture=rsi
