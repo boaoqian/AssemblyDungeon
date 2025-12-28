@@ -72,10 +72,10 @@ run_game:
     mov rdi, [max_mobs]          ; 例：本关总共最多生成60只怪（你想要多少改这里）
     call map_init
 
-    ;test
-    ; mov rdi, 200
-    ; mov rsi, 200
-    ; call gen_drop
+    ; test
+    mov rdi, 200
+    mov rsi, 200
+    call gen_drop
     
 .loop:
     call SDL_GetTicks
